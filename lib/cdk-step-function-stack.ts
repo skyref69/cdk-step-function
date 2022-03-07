@@ -15,45 +15,60 @@ export class CdkStepFunctionStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);   
 
-    // Lambda to generate a random number
-    const generateRandomNumber = new aws_lambda_nodejs.NodejsFunction(this,"createRandom",{
+    // Lambda for state vote
+    const stateVote = new aws_lambda_nodejs.NodejsFunction(this,"stateVote",{
       runtime: aws_lambda.Runtime.NODEJS_14_X,      
-      entry: 'lambda/createRandom.ts',
-      handler: 'createRandom', 
+      entry: 'lambda/stateVote.ts',
+      handler: 'stateVote', 
     })
 
-    //Lambda invocation for generating a random number
-    const generateRandomNumberInvocation = new LambdaInvoke(this, 'Generate random number invocation', {
-     lambdaFunction: generateRandomNumber,
+    // INVOCATION Lambda  for state vote
+    const stateVoteInvocation = new LambdaInvoke(this, 'state vote invocation', {
+     lambdaFunction: stateVote,
      outputPath: '$.Payload',
     });
     
-    // Lambda function called if the generated number is greater than the expected number
-    const functionGreaterThan = new aws_lambda_nodejs.NodejsFunction(this,"NumberGreaterThan",{
+    // Lambda function called if vote is OPEN
+    const functionOpenVote = new aws_lambda_nodejs.NodejsFunction(this,"openVote",{
       runtime: aws_lambda.Runtime.NODEJS_14_X,      
-      entry: 'lambda/greater.ts',
-      handler: 'greater', 
+      entry: 'lambda/openVote.ts',
+      handler: 'openVote', 
       timeout: Duration.seconds(3),
     })
 
-    // Lambda invocation if the generated number is greater than the expected number
-    const greaterThanInvocation = new LambdaInvoke(this, 'Get Number is greater than invocation', {
-      lambdaFunction: functionGreaterThan,
+    // INVOCATION lambda if vote is OPEN
+    const functionOpenVoteInvocation = new LambdaInvoke(this, 'state vote open', {
+      lambdaFunction: functionOpenVote,
       inputPath: '$',
       outputPath: '$',
      });
 
-    // Lambda function called if the generated number is less than or equal to the expected number
-    const functionLessThanOrEqual = new aws_lambda_nodejs.NodejsFunction(this,"NumberLessThan",{
+      // Lambda function called if vote is CLOSED
+      const functionClosedVote = new aws_lambda_nodejs.NodejsFunction(this,"closeVote",{
       runtime: aws_lambda.Runtime.NODEJS_14_X,      
-      entry: 'lambda/lessOrEqual.ts',
-      handler: 'lessOrEqual', 
+      entry: 'lambda/closeVote.ts',
+      handler: 'closeVote', 
       timeout: Duration.seconds(3),
     })
 
-    // Lambda invocation if the generated number is less than or equal to the expected number
-    const lessThanOrEqualInvocation = new LambdaInvoke(this, 'Get Number is less than or equal invocation', {
-      lambdaFunction: functionLessThanOrEqual,
+    // INVOCATION lambda if vote is CLOSE
+    const functionClosedVoteInvocation = new LambdaInvoke(this, 'state vote closed', {
+      lambdaFunction: functionClosedVote,
+      inputPath: '$',
+      outputPath: '$',
+     });
+
+    // Lambda function called if vote is UNDEFINED
+    const functionUndeStateVote = new aws_lambda_nodejs.NodejsFunction(this,"undefinedStateVote",{
+      runtime: aws_lambda.Runtime.NODEJS_14_X,      
+      entry: 'lambda/undefinedStateVote.ts',
+      handler: 'undefinedStateVote', 
+      timeout: Duration.seconds(3),
+    })
+
+    // INVOCATION lambda if vote is CLOSE
+    const functionUndeStateVoteInvocation = new LambdaInvoke(this, 'state vote undefined', {
+      lambdaFunction: functionClosedVote,
       inputPath: '$',
       outputPath: '$',
      });
@@ -65,16 +80,17 @@ export class CdkStepFunctionStack extends Stack {
 
      //Choice condition for workflow
      const numberChoice = new Choice(this, 'Job Complete?')
-      .when(sfn.Condition.numberGreaterThanJsonPath('$.generatedRandomNumber', '$.numberToCheck'), greaterThanInvocation)
-      .when(sfn.Condition.numberLessThanEqualsJsonPath('$.generatedRandomNumber', '$.numberToCheck'), lessThanOrEqualInvocation).otherwise(lessThanOrEqualInvocation);
+      .when(sfn.Condition.stringEquals('$.stateVote', 'open'), functionOpenVoteInvocation)
+      .when(sfn.Condition.stringEquals('$.stateVote', 'closed'), functionClosedVoteInvocation)
+      .otherwise(functionUndeStateVoteInvocation);
 
     //Create the workflow definition
-    const definition = generateRandomNumberInvocation.next(wait1Second).next(numberChoice);
+    const definition = stateVoteInvocation.next(wait1Second).next(numberChoice);
 
     //Create the statemachine
     new StateMachine(this, "StateMachine", {
       definition,
-      stateMachineName: 'randomNumberStateMachine',
+      stateMachineName: 'StateVote-StateMachine',
       timeout: Duration.minutes(5),
     });
     
