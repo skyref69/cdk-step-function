@@ -16,7 +16,7 @@ export class CdkStepFunctionStack extends Stack {
     super(scope, id, props);   
 
     // Lambda for state vote
-    const stateVote = new aws_lambda_nodejs.NodejsFunction(this,"stateVote",{
+    const stateVote = new aws_lambda_nodejs.NodejsFunction(this,"stateVote2222",{
       runtime: aws_lambda.Runtime.NODEJS_14_X,      
       entry: 'lambda/stateVote.ts',
       handler: 'stateVote', 
